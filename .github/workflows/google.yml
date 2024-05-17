@@ -10,37 +10,47 @@
 #
 # For more support on how to run the workflow, please visit https://github.com/google-github-actions/setup-gcloud/tree/master/example-workflows/gke-kustomize
 
-name: Build and Plan Development
+name: Build and Deploy to GKE
 
 on:
   push:
-    branches: [ trunk ]
+    branches: [ "main" ]
+
+env:
+  PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+  GAR_LOCATION: us-central1 # TODO: update region of the Artifact Registry
+  GKE_CLUSTER: cluster-1    # TODO: update to cluster name
+  GKE_ZONE: us-central1-c   # TODO: update to cluster zone
+  DEPLOYMENT_NAME: gke-test # TODO: update to deployment name
+  REPOSITORY: samples # TODO: update to Artifact Registry docker repository
+  IMAGE: static-site
 
 jobs:
-  build_push_dev:
-    name: Build Dev
-    needs: [ identify ]
+  setup-build-publish-deploy:
+    name: Setup, Build, Publish, and Deploy
     runs-on: ubuntu-latest
-    environment: dev
+    environment: production
+
     permissions:
       contents: 'read'
       id-token: 'write'
+
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-node@v3
-    - run: npm ci
-    - name: Authenticate with Google Cloud
-      id: auth_dev
-      uses: google-github-actions/auth@v2
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    # Configure Workload Identity Federation and generate an access token.
+    - id: 'auth'
+      name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v2'
       with:
-        token_format: access_token
-        workload_identity_provider: projects/12345/locations/global/workloadIdentityPools/github-actions/providers/github-actions
-        service_account: ABCDEFG@foo.iam.gserviceaccount.com
-        access_token_lifetime: 300s
+        token_format: 'access_token'
+        workload_identity_provider: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider'
+        service_account: 'my-service-account@my-project.iam.gserviceaccount.com'
 
     # Alternative option - authentication via credentials json
     # - id: 'auth'
-    #   uses: 'google-github-actions/auth@v0'
+    #   uses: 'google-github-actions/auth@v2'
     #   with:
     #     credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
@@ -49,7 +59,7 @@ jobs:
         echo ${{steps.auth.outputs.access_token}} | docker login -u oauth2accesstoken --password-stdin https://$GAR_LOCATION-docker.pkg.dev
     # Get the GKE credentials so we can deploy to the cluster
     - name: Set up GKE credentials
-      uses: google-github-actions/get-gke-credentials@v0
+      uses: google-github-actions/get-gke-credentials@v2
       with:
         cluster_name: ${{ env.GKE_CLUSTER }}
         location: ${{ env.GKE_ZONE }}
