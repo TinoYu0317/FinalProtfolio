@@ -97,7 +97,7 @@ function levelFour(){
       ballSize = ballSize + 20;
   }    
   if(score>= 40){
-    background(255);
+    background(random(255));
   }
   imageMode(CENTER);
   image(boom,ballx,bally,ballSize,ballSize);
